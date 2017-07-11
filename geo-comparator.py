@@ -163,17 +163,18 @@ class GeoTool:
 
         # ITERATE OVER DIVISION LIST AND COLLECT THEM
         for d in division_list:
-            country_code = d['countryCode']
-            division = Division(d['divisionCode'], d['divisionName'], d['divisionType'])
-            divisionCode = '%s-%s' % (country_code, d['divisionCode'])
+            country_code = d['country_code']
+            division = Division(d['code'], d['subdivision_name'], None)
+            divisionCode = '%s' % (d['code'])
 
+            # if divisionCode != "-":
             # BUILD A MAP COLLECTING COUNTRY CODE AS KEY AND DIVISION AS VALUE
             if final_country_map.has_key(country_code):
-                final_country_map[country_code]['divisions'][divisionCode] = d['divisionName']
+                final_country_map[country_code]['divisions'][divisionCode] = d['subdivision_name']
 
             else:
                 final_country_map[country_code] = {'divisions': {}}
-                final_country_map[country_code]['divisions'][divisionCode] = d['divisionName']
+                final_country_map[country_code]['divisions'][divisionCode] = d['subdivision_name']
 
         # SORT
         self.final_country_map = self.sort_map(final_country_map)
