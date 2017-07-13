@@ -71,6 +71,104 @@ class Division:
         self.type = type
 
 
+class GeoIP2Location:
+    def __init__(self, geoname_id, locale_code, continent_code, continent_name, country_iso_code,
+                 country_name, subdivision_1_iso_code, subdivision_1_name, subdivision_2_iso_code,
+                 subdivision_2_name, city_name, metro_code, time_zone):
+
+        self.geoname_id = geoname_id
+        self.locale_code = locale_code
+        self.continent_code = continent_code
+        self.continent_name = continent_name
+        self.country_iso_code = country_iso_code
+        self.country_name =country_name
+        self.subdivision_1_iso_code =subdivision_1_iso_code
+        self.subdivision_1_name =subdivision_1_name
+        self.subdivision_2_iso_code = subdivision_2_iso_code
+        self.subdivision_2_name = subdivision_2_name
+        self.city_name = city_name
+        self.metro_code = metro_code
+        self.time_zone = time_zone
+
+    def get_geoname_id(self):
+        return self.geoname_id
+
+    def set_geoname_id(self, geoname_id):
+        self.geoname_id = geoname_id
+
+    def get_locale_code(self):
+        return self.locale_code
+
+    def set_locale_code(self, locale_code):
+        self.locale_code = locale_code
+
+    def get_continent_code(self):
+        return self.continent_code
+
+    def set_continent_code(self, continent_code):
+        self.continent_code = continent_code
+
+    def get_continent_name(self):
+        return self.continent_name
+
+    def set_continent_name(self, continent_name):
+        self.continent_name = continent_name
+
+    def get_country_iso_code(self):
+        return self.country_iso_code
+
+    def set_country_iso_code(self, country_iso_code):
+        self.country_iso_code = country_iso_code
+
+    def get_country_name(self):
+        return self.country_name
+
+    def set_country_name(self, country_name):
+        self.country_name = country_name
+
+    def get_subdivision_1_iso_code(self):
+        return self.subdivision_1_iso_code
+
+    def set_subdivision_1_iso_code(self, subdivision_1_iso_code):
+        self.subdivision_1_iso_code = subdivision_1_iso_code
+
+    def get_subdivision_1_name(self):
+        return self.subdivision_1_name
+
+    def set_subdivision_1_name(self, subdivision_1_name):
+        self.subdivision_1_name = subdivision_1_name
+
+    def get_subdivision_2_iso_code(self):
+        return self.subdivision_2_iso_code
+
+    def set_subdivision_2_iso_code(self, subdivision_2_iso_code):
+        self.subdivision_2_iso_code = subdivision_2_iso_code
+
+    def get_subdivision_2_name(self):
+        return self.subdivision_2_name
+
+    def set_(self, subdivision_2_name):
+        self.subdivision_2_name = subdivision_2_name
+
+    def get_city_name(self):
+        return self.city_name
+
+    def set_city_name(self, city_name):
+        self.city_name = city_name
+
+    def get_metro_code(self):
+        return self.metro_code
+
+    def set_metro_code(self, metro_code):
+        self.metro_code = metro_code
+
+    def get_time_zone(self):
+        return self.time_zone
+
+    def set_time_zone(self, time_zone):
+        self.time_zone = time_zone
+
+
 class GeoTool:
     def __init__(self, filepath_1, filepath_2):
         self.filepath_1 = filepath_1
@@ -115,6 +213,51 @@ class GeoTool:
     def write_json_file(self, absolute_path, stuff_to_write):
         with codecs.open(absolute_path, 'w', encoding='utf8') as outfile:
             json.dump(stuff_to_write, outfile, indent=4, ensure_ascii=False)
+
+
+    def generate_map_from_geoIP2_list(self, output):
+        self.final_country_map = {}
+
+        # LOAD FILE 1
+        file_1 = self.get_filepath_1()
+        geoIP2_location_list = self.read_json_file(file_1)
+
+        # ITERATE OVER COUNTRY LIST AND CHECK ON MAP
+        for l in geoIP2_location_list:
+            location = GeoIP2Location(l['geoname_id'], l['locale_code'], l['continent_code'], l['continent_name'],
+                                    l['country_iso_code'], l['country_name'], l['subdivision_1_iso_code'],
+                                    l['subdivision_1_name'], l['subdivision_2_iso_code'], l['subdivision_2_name'],
+                                    l['city_name'], l['metro_code'], l['time_zone'])
+
+            country_code = location.get_country_iso_code()
+            if country_code is not None and country_code != "":
+                # CHECK IF LOCATION IS ALREADY IN THE MAP
+                if country_code in self.final_country_map:
+                    self.set_subdivisions(location)
+
+                else:
+                    self.final_country_map[country_code] = {'name': location.get_country_name(), 'divisions': {}}
+                    print ('%s - %s' % (country_code, location.get_country_name()))
+                    self.set_subdivisions(location)
+
+        # SORT
+        self.final_country_map = self.sort_map(self.final_country_map)
+
+        if output is not None:
+            self.write_json_file(output, self.final_country_map)
+
+
+    def set_subdivisions(self, location):
+        country_code = location.get_country_iso_code()
+
+        # CHECK THE SUBDIVISION_1
+        subdivision_1_code = location.get_subdivision_1_iso_code()
+        subdivision_1_name = location.get_subdivision_1_name()
+        if subdivision_1_code is not None and subdivision_1_code != "":
+            division_code = '%s-%s' % (country_code, subdivision_1_code)
+
+            if division_code not in self.final_country_map[country_code]['divisions']:
+                self.final_country_map[country_code]['divisions'][division_code] = subdivision_1_name
 
 
     def compare(self, output):
@@ -213,6 +356,7 @@ if __name__ == "__main__":
     else:
         print("######### DIVISIONS MAPPER [BEGIN] #########")
         geoTool = GeoTool(filepath_1, None)
-        output = "/Users/daniele.autizi/Downloads/subdivision_export-1.json"
-        geoTool.division_mapper(output)
+        output = "/Users/daniele.autizi/Downloads/subdivision_export-2.json"
+        # geoTool.division_mapper(output)
+        geoTool.generate_map_from_geoIP2_list(output)
         print("######### DIVISIONS MAPPER [END] #########")
