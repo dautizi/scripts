@@ -1,6 +1,8 @@
 import sys
+import os
 import json
 import codecs
+import csv
 from collections import OrderedDict
 
 
@@ -201,6 +203,28 @@ class GeoTool:
     def get_filepath_2(self):
         return self.filepath_2
 
+
+    def open_and_convert_csv_file_into_json(self, filepath):
+        json_file = None
+        if filepath is not None:
+            filename, file_extension = os.path.splitext(filepath)
+
+            if os.path.isfile(filepath) and file_extension == '.csv':
+                with codecs.open(filepath, 'r') as f:
+                    reader = csv.DictReader(f)
+                    rows = list(reader)
+
+                json_file = '%s.%s' % (filename, 'json')
+                with codecs.open(json_file, 'w') as outfile:
+                    json.dump(rows, outfile)
+
+            else:
+                print 'Input file %s not found or not in a valid csv format.' % (filepath)
+        else:
+            print 'You did not provide an input file. '
+
+        return json_file
+
     def read_json_file(self, filepath):
         d = None
         if filepath is not None:
@@ -209,21 +233,26 @@ class GeoTool:
 
         return d
 
-
     def write_json_file(self, absolute_path, stuff_to_write):
         with codecs.open(absolute_path, 'w', encoding='utf8') as outfile:
             json.dump(stuff_to_write, outfile, indent=4, ensure_ascii=False)
 
-
     def generate_map_from_geoIP2_list(self, output):
         self.final_country_map = {}
 
+        # CONVERT CSV FILE
+        csv_file = self.get_filepath_1()
+        json_file = self.open_and_convert_csv_file_into_json(csv_file)
+
+        if json_file is None:
+            print 'Nothing has been generated!'
+            return None
+
         # LOAD FILE 1
-        file_1 = self.get_filepath_1()
-        geoIP2_location_list = self.read_json_file(file_1)
+        geo_ip2_location_list = self.read_json_file(json_file)
 
         # ITERATE OVER COUNTRY LIST AND CHECK ON MAP
-        for l in geoIP2_location_list:
+        for l in geo_ip2_location_list:
             location = GeoIP2Location(l['geoname_id'], l['locale_code'], l['continent_code'], l['continent_name'],
                                     l['country_iso_code'], l['country_name'], l['subdivision_1_iso_code'],
                                     l['subdivision_1_name'], l['subdivision_2_iso_code'], l['subdivision_2_name'],
@@ -246,7 +275,6 @@ class GeoTool:
         if output is not None:
             self.write_json_file(output, self.final_country_map)
 
-
     def set_subdivisions(self, location):
         country_code = location.get_country_iso_code()
 
@@ -259,73 +287,6 @@ class GeoTool:
             if division_code not in self.final_country_map[country_code]['divisions']:
                 self.final_country_map[country_code]['divisions'][division_code] = subdivision_1_name
 
-
-    def compare(self, output):
-        final_country_map = {}
-
-        # LOAD FILE 1
-        file_1 = self.get_filepath_1()
-        country_list = self.read_json_file(file_1)
-
-        # LOAD FILE 2
-        file_2 = self.get_filepath_2()
-        country_map = self.read_json_file(file_2)
-
-        # ITERATE OVER COUNTRY LIST AND CHECK ON MAP
-        for c in country_list:
-            country = Country(c['code'], c['name'], None, c['code3'], c['numeric'])
-
-            # CHECK IF COUNTRY IS IN THE MAP
-            if country_map.has_key(country.get_code()):
-                countryByCode = country_map[country.get_code()]
-
-                # ADD DIVISIONS TO COUNTRY
-                divisions = countryByCode['divisions']
-                country.set_divisions(divisions)
-
-                # CONVERT INTO JSON AND ADD TO THE FINAL MAP
-                final_country_map[country.get_code()] = {'name': country.get_name(), 'divisions': divisions}
-
-            else:
-                final_country_map[country.get_code()] = {'name': country.get_name(), 'divisions': {}}
-                print ('%s - %s' % (country.get_code(), country.get_name()))
-
-        # SORT
-        self.final_country_map = self.sort_map(final_country_map)
-
-        if output is not None:
-            self.write_json_file(output, self.final_country_map)
-
-
-    def division_mapper(self, output):
-        final_country_map = {}
-
-        # LOAD FILE 1
-        file_1 = self.get_filepath_1()
-        division_list = self.read_json_file(file_1)
-
-        # ITERATE OVER DIVISION LIST AND COLLECT THEM
-        for d in division_list:
-            country_code = d['country_code']
-            division = Division(d['code'], d['subdivision_name'], None)
-            divisionCode = '%s' % (d['code'])
-
-            # if divisionCode != "-":
-            # BUILD A MAP COLLECTING COUNTRY CODE AS KEY AND DIVISION AS VALUE
-            if final_country_map.has_key(country_code):
-                final_country_map[country_code]['divisions'][divisionCode] = d['subdivision_name']
-
-            else:
-                final_country_map[country_code] = {'divisions': {}}
-                final_country_map[country_code]['divisions'][divisionCode] = d['subdivision_name']
-
-        # SORT
-        self.final_country_map = self.sort_map(final_country_map)
-
-        if output is not None:
-            self.write_json_file(output, self.final_country_map)
-
-
     def sort_map(self, map_to_sort):
         final_map = OrderedDict()
         sorted_map = sorted(map_to_sort)
@@ -337,26 +298,27 @@ class GeoTool:
 
 
 if __name__ == "__main__":
+    # HOW TO CALL
+    # 1. install OrderedDict module: pip install ordereddict
+    # python geo-comparator.py /your_path/GeoIP2-City-Locations-en.csv /your_path/xxx.json
+    default_output = "/tmp/country_map.json"
+
     # GET FILE PATHS
     argv_size = len(sys.argv)
     filepath_1 = None
-    filepath_2 = None
 
     if argv_size > 1:
         filepath_1 = sys.argv[1]
 
+    print("######### COUNTRY MAP BUILDING [BEGIN] #########")
+    geoTool = GeoTool(filepath_1, None)
+
     if argv_size > 2:
-        filepath_2 = sys.argv[2]
-        print("######### COUNTRY LISTS COMPARISON [BEGIN] #########")
-        geoTool = GeoTool(filepath_1, filepath_2)
-        output = "/Users/daniele.autizi/Downloads/subdivision_export.json"
-        geoTool.compare(output)
-        print("######### COUNTRY LISTS COMPARISON [END] #########")
+        default_output = sys.argv[2]
+        geoTool.generate_map_from_geoIP2_list(default_output)
 
     else:
-        print("######### DIVISIONS MAPPER [BEGIN] #########")
-        geoTool = GeoTool(filepath_1, None)
-        output = "/Users/daniele.autizi/Downloads/subdivision_export-2.json"
-        # geoTool.division_mapper(output)
-        geoTool.generate_map_from_geoIP2_list(output)
-        print("######### DIVISIONS MAPPER [END] #########")
+        geoTool.generate_map_from_geoIP2_list(default_output)
+
+    print("Output: %s" % default_output)
+    print("######### COUNTRY MAP BUILDING [END] #########")
